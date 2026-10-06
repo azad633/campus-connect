@@ -2676,3 +2676,10 @@ html.reduced::view-transition-group(*), html.reduced::view-transition-old(*), ht
   .adm-prof-row { grid-template-columns: auto minmax(0, 1fr); }
   .adm-prof-nums { grid-column: 1 / -1; justify-content: flex-start; text-align: left; }
 }
+/* Ordinateur : le bloc du haut (mur + colonne de droite) garde la hauteur de l'écran, la section « Profils »
+ * vient en dessous, dans le flux normal ; la page défile au lieu de tout écraser dans 100vh. */
+@media (min-width: 1100px) and (min-height: 640px) {
+  .adm { height: auto; min-height: 100vh; min-height: 100dvh; overflow: visible; }
+  .adm-grid { flex: none; height: max(560px, calc(100vh - 96px)); height: max(560px, calc(100dvh - 96px)); }
+  .adm-prof { flex: none; margin-top: 0; }
+}
