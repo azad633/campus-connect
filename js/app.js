@@ -4750,7 +4750,62 @@
             '</section>' +
           '</div>' +
         '</div>' +
+        admProfilesHTML() +
       '</section>';
+  }
+
+  /* ---------- Section « Profils » (lecture seule) : tous les profils, recherche, mise à jour en direct ---------- */
+  var admProfQ = '';
+  function admProfilesHTML() {
+    return '<section class="adm-card adm-prof" aria-labelledby="adm-prof-h">' +
+      '<div class="adm-card-head">' +
+        '<h2 class="adm-h" id="adm-prof-h">Profils <span class="adm-prof-n" id="adm-prof-n"></span></h2>' +
+        '<span class="adm-hint">Lecture seule · clique sur un profil pour l\'ouvrir</span>' +
+      '</div>' +
+      '<label class="adm-prof-search"><span class="sr-only">Rechercher un profil</span>' + icon('search') +
+        '<input type="search" id="adm-prof-q" placeholder="Prénom, filière, passion…" autocomplete="off" value="' + esc(admProfQ) + '"></label>' +
+      '<ol class="adm-prof-list" id="adm-prof-list"></ol>' +
+    '</section>';
+  }
+  function admProfTime(id) {
+    var t = CC.sync && typeof CC.sync.joinedAt === 'function' ? CC.sync.joinedAt(id) : 0;
+    if (!t) return '';
+    var d = new Date(t), now = new Date();
+    var hm = String(d.getHours()).padStart(2, '0') + 'h' + String(d.getMinutes()).padStart(2, '0');
+    return d.toDateString() === now.toDateString() ? 'inscrit·e à ' + hm : 'inscrit·e le ' + d.getDate() + '/' + (d.getMonth() + 1) + ' à ' + hm;
+  }
+  function admProfilesRender() {
+    var a = adm, list = a && $('#adm-prof-list', a.root);
+    if (!list) return;
+    var acts = S.upcoming();
+    var people = S.people().slice();
+    var q = admProfQ.trim().toLowerCase();
+    var rows = people.map(function (p) {
+      var pass = (p.passions || []).map(function (x) { return S.passion(x.id); }).filter(Boolean);
+      var org = S.organizedBy(p.id).length;
+      var part = acts.filter(function (x) { return x.participants.indexOf(p.id) >= 0; }).length;
+      var msgs = 0;
+      acts.forEach(function (x) { S.messages(x.id).forEach(function (m) { if (m.personId === p.id) msgs++; }); });
+      var hay = [p.firstName, p.lastName, p.program, p.role, p.id].concat(pass.map(function (x) { return x.label; })).join(' ').toLowerCase();
+      return { p: p, pass: pass, org: org, part: part, msgs: msgs, hay: hay, t: (CC.sync && CC.sync.joinedAt ? CC.sync.joinedAt(p.id) : 0) };
+    });
+    var n = $('#adm-prof-n', a.root);
+    if (n) n.textContent = people.length;
+    rows = rows.filter(function (r) { return !q || r.hay.indexOf(q) >= 0; });
+    rows.sort(function (x, y) { return (y.t - x.t) || String(x.p.firstName).localeCompare(String(y.p.firstName)); });
+    list.innerHTML = rows.length ? rows.map(function (r) {
+      var p = r.p, when = admProfTime(p.id);
+      var badges = (p.team ? '<span class="adm-prof-b">Équipe</span>' : '') + (p.role === 'prof' ? '<span class="adm-prof-b">Prof</span>' : '') +
+        (p.visible === false ? '<span class="adm-prof-b adm-prof-b--off">Masqué</span>' : '');
+      return '<li><a class="adm-prof-row" href="#/person/' + encodeURIComponent(p.id) + '">' +
+        avatar(p, 38) +
+        '<span class="adm-prof-main"><span class="adm-prof-name">' + esc((p.firstName || '') + (p.lastName ? ' ' + p.lastName : '')) + badges + '</span>' +
+          '<span class="adm-prof-meta">' + esc([p.role === 'prof' ? 'Prof' : 'Étudiant·e', p.program, when].filter(Boolean).join(' · ')) + '</span>' +
+          '<span class="adm-prof-pass">' + (r.pass.length ? r.pass.slice(0, 5).map(function (x) { return '<span>' + esc(x.emoji + ' ' + x.label) + '</span>'; }).join('') : '<span class="adm-prof-none">aucune passion</span>') + '</span></span>' +
+        '<span class="adm-prof-nums"><span title="Activités organisées"><b>' + r.org + '</b> orga</span><span title="Participations (à venir)"><b>' + r.part + '</b> particip.</span><span title="Messages"><b>' + r.msgs + '</b> msg</span>' +
+          '<code title="' + esc(p.id) + '">' + esc(p.id.length > 12 ? p.id.slice(0, 12) + '…' : p.id) + '</code></span>' +
+      '</a></li>';
+    }).join('') : '<li class="adm-prof-empty">' + esc(q ? 'Aucun profil ne correspond.' : 'Aucun profil pour l\'instant.') + '</li>';
   }
 
   /* « Continuer en tant qu'Ewan » (mode live) : l'ordinateur d'Ewan prend son profil (celui du seed), sans inscription,
@@ -4816,6 +4871,17 @@
     admRenderFeed(true);
     admEarlier();
     admSimUi();
+    admProfilesRender();
+    var pq = $('#adm-prof-q', root);
+    if (pq) pq.addEventListener('input', function () { admProfQ = pq.value; admProfilesRender(); });
+    a.profT = 0;
+    var profSoon = function () {
+      clearTimeout(a.profT);
+      a.profT = setTimeout(function () { if (adm === a) admProfilesRender(); }, 400);
+    };
+    a.offProf = typeof S.on === 'function' ? S.on('change', profSoon) : null;
+    a.offProfSt = typeof S.on === 'function' ? S.on('status', profSoon) : null;
+    a.profT0 = setTimeout(function () { if (adm === a) admProfilesRender(); }, 1500); // la base distante arrive après l'affichage
     paintPills();
     var vp = $('#adm-mini-vp', root);
     if (vp) mountWall(vp, { mini: true, k: admFit() });
@@ -4837,6 +4903,10 @@
     if (!a) return;
     clearInterval(a.t);
     clearTimeout(a.soonT);
+    clearTimeout(a.profT);
+    clearTimeout(a.profT0);
+    if (typeof a.offProf === 'function') a.offProf();
+    if (typeof a.offProfSt === 'function') a.offProfSt();
     if (a.rz) cancelAnimationFrame(a.rz);
     window.removeEventListener('resize', a.onRz);
     adm = null;

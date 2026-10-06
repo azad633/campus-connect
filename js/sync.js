@@ -1039,6 +1039,8 @@ window.CC = window.CC || {};
     enabled: true,
     status: function () { return S.syncStatus(); },
     pending: function () { return outbox().length; },
+    /* lecture seule (panel organisateur, section Profils) : heure d'arrivée d'un profil dans la base */
+    joinedAt: function (id) { var c = R && R.people && R.people[id]; return c && typeof c.at === 'number' ? c.at : 0; },
     resync: function () { snapshot('resync'); },
     flush: retryNow,
     _debug: function () {

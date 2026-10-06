@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#5B3DF5">
+  <meta name="robots" content="noindex">
+  <title>Campus Connect · démo</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 52 34'%3E%3Ccircle cx='18' cy='17' r='13' fill='%235B3DF5'/%3E%3Ccircle cx='34' cy='17' r='13' fill='%23FF6B4A'/%3E%3Cpath d='M26 6.75a13 13 0 0 1 0 20.5a13 13 0 0 1 0-20.5z' fill='%231A1730'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body class="is-guest">
+  <div id="app"></div>
+  <!-- DÉMO AVEC BOTS : la même app que la version live (../js/), mais branchée sur une fausse base locale
+       au navigateur (mock-supabase.js, clé cc_demo_db). Rien ne part vers Supabase. demo-bots.js remplit
+       cette base (personnes, activités, discussions de démo) puis fait vivre des bots : inscriptions,
+       participations, messages, nouvelles activités.
+       ?as=NOM   appareil séparé (état local cc_demo_NOM) : ?as=etudiant pour le site, ?as=ewan pour le panel (#/admin)
+       ?reset=1  vide la démo (base + états locaux) puis recharge -->
+  <script src="mock-supabase.js"></script>
+  <script>
+  (function () {
+    'use strict';
+    var q = window.location.search;
+    function param(k) { var m = q.match(new RegExp('[?&]' + k + '=([A-Za-z0-9_-]{1,16})')); return m ? m[1] : null; }
+    if (param('reset') === '1') {
+      try {
+        Object.keys(window.localStorage).forEach(function (k) { if (/^cc_demo/.test(k)) window.localStorage.removeItem(k); });
+      } catch (e) { /* rien */ }
+      window.location.replace(window.location.pathname + (param('as') ? '?as=' + param('as') : '') + window.location.hash);
+      return;
+    }
+    var as = param('as') || 'site';
+    window.__ccDemo = { as: as };
+    var cfg = 'window.CC = window.CC || {}; window.CC.config = { supabaseUrl: "https://demo.invalid", ' +
+      'supabaseAnonKey: "demo-key", storageKey: "cc_demo_' + as + '" };';
+    /* Même ordre que ../index.html. Pas de CDN : le faux client remplace supabase-js. */
+    var list = ['js/config.js', 'js/copy.js', 'js/data.js', 'js/store.js', 'js/sync.js', 'js/fx.js', 'js/app.js'];
+    var html = '';
+    list.forEach(function (src) {
+      html += '<script src="../' + src + '"><\/script>';
+      if (src === 'js/config.js') html += '<script>' + cfg + '<\/script>';
+      /* copie des données de démo AVANT store.js (en live, l'app ne garde que le profil d'Ewan) */
+      if (src === 'js/data.js') html += '<script>window.__ccDemoSeed = JSON.parse(JSON.stringify(window.CC.data));<\/script>';
+    });
+    html += '<script src="demo-bots.js"><\/script>';
+    document.write(html);
+  })();
+  </script>
+</body>
+</html>
